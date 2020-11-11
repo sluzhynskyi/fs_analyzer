@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include<sys/types.h>
 #include<sys/stat.h>
+#include <ctime>
 
 using std::cout;
 using std::cerr;
@@ -14,6 +15,8 @@ using std::vector;
 
 #define BASE_OFFSET 1024
 int block_size;
+int inode_size;
+int inode_table;
 
 int read_group_desc(int, struct ext2_group_desc *);
 
@@ -21,7 +24,7 @@ int print_super(int, struct ext2_super_block *);
 
 int read_inode_from_table(int, int, int, int, struct ext2_inode *);
 
-int read_dir(int fd, struct ext2_inode *inode, struct ext2_group_desc *group);
+int print_recursive_dir(int fd, struct ext2_inode *inode, string path);
 
 int main(int argc, char **argv) {
     int fd;
@@ -39,14 +42,14 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     read_group_desc(fd, &group_desc);
-    int inode_table = group_desc.bg_inode_table;
-    int inode_size = super.s_inode_size;
+    inode_table = group_desc.bg_inode_table;
+
     root_inode = (struct ext2_inode *) malloc(inode_size);
-    if (read_inode_from_table(fd, inode_table, inode_size, 12, root_inode) != 0) {
+    if (read_inode_from_table(fd, inode_table, inode_size, 2, root_inode) != 0) {
         cout << "failed to read root inode" << endl;
         return EXIT_FAILURE;
     }
-    read_dir(fd, root_inode, &group_desc);
+    print_recursive_dir(fd, root_inode, "/");
     close(fd);
     exit(0);
 
@@ -70,7 +73,7 @@ int print_super(int fd, struct ext2_super_block *super) {
     if (super->s_magic != EXT2_SUPER_MAGIC)
         return EXIT_FAILURE;
     block_size = 1024 << super->s_log_block_size;
-
+    inode_size = super->s_inode_size;
     cout << "Inodes count                                   : " << super->s_inodes_count << endl;
     cout << "Blocks count                                   : " << super->s_blocks_count << endl;
     cout << "Reserved blocks count                          : " << super->s_r_blocks_count << endl;
@@ -118,7 +121,7 @@ int read_inode_from_table(int fd, int table, int size, int inode_numb, struct ex
     return 0;
 }
 
-int read_dir(int fd, struct ext2_inode *inode, struct ext2_group_desc *group) {
+int print_recursive_dir(int fd, struct ext2_inode *inode, string path) {
     char *block;
     size_t c = 0;
     if (S_ISDIR(inode->i_mode)) {
@@ -126,14 +129,34 @@ int read_dir(int fd, struct ext2_inode *inode, struct ext2_group_desc *group) {
         block = static_cast<char *>(malloc(block_size));
         lseek(fd, inode->i_block[0] * block_size, SEEK_SET);
         read(fd, block, block_size);                /* read block from disk*/
-
         while (c < block_size) {
             entry = reinterpret_cast<struct ext2_dir_entry_2 *>(block + c);
             char file_name[EXT2_NAME_LEN + 1];
             memcpy(file_name, entry->name, entry->name_len);
             file_name[entry->name_len] = 0;
-            cout << file_name << " inode no:" << entry->inode << endl;
+            string s_file_name = file_name;
             c += entry->rec_len;
+            if (s_file_name == "." || s_file_name == "..") {
+                continue;
+            }
+            read_inode_from_table(fd, inode_table, inode_size, entry->inode, inode);
+            string file_type;
+            if S_ISREG(inode->i_mode){
+                file_type = "File";
+            } else if S_ISDIR(inode->i_mode){
+                file_type = "Dir";
+            }
+            time_t modification_time = inode->i_mtime;
+            cout << path << file_name << endl; // File path
+            cout << "File size: " << inode->i_size << endl;
+            cout << "Modification time: " << ctime(&modification_time) << flush;
+            cout << file_type << endl;
+            cout << "Owner ID: " << inode->i_uid << endl;
+            cout << "Hard links: " << inode->i_links_count << endl;
+            cout << "----------------------------------------------------------" << endl;
+
+
+            print_recursive_dir(fd, inode, path + file_name + "/");
         }
         free(block);
     }
