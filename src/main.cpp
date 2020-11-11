@@ -1,44 +1,62 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
-// Remember to include ALL the necessary headers!
 #include <iostream>
 #include <boost/program_options.hpp>
+#include<ext2fs/ext2_fs.h>
+#include<fcntl.h>
 
-// By convention, C++ header files use the `.hpp` extension. `.h` is OK too.
-#include "arithmetic/arithmetic.hpp"
+using std::cout;
+using std::cerr;
+using std::flush;
+using std::endl;
+using std::string;
+using std::vector;
 
-int main(int argc, char **argv) {
-    int variable_a, variable_b;
+#define BASE_OFFSET 1024
+int block_size;
 
-    namespace po = boost::program_options;
+int print_super(int fd, struct ext2_super_block *super) {
 
-    po::options_description visible("Supported options");
-    visible.add_options()
-            ("help,h", "Print this help message.");
+    int scount, rcount;
+    string s;
 
-    po::options_description hidden("Hidden options");
-    hidden.add_options()
-            ("a", po::value<int>(&variable_a)->default_value(0), "Variable A.")
-            ("b", po::value<int>(&variable_b)->default_value(0), "Variable B.");
-
-    po::positional_options_description p;
-    p.add("a", 1);
-    p.add("b", 1);
-
-    po::options_description all("All options");
-    all.add(visible).add(hidden);
-
-    po::variables_map vm;
-    po::store(po::command_line_parser(argc, argv).options(all).positional(p).run(), vm);
-    po::notify(vm);
-
-    if (vm.count("help")) {
-        std::cout << "Usage:\n  add [a] [b]\n" << visible << std::endl;
-        return EXIT_SUCCESS;
+    if ((scount = lseek(fd, BASE_OFFSET, SEEK_SET)) != BASE_OFFSET) {
+        cout << "scount is " << (int) scount << endl;
+        return EXIT_FAILURE;
     }
 
-    int result = arithmetic::add(variable_a, variable_b);
-    std::cout << result << std::endl;
-    return EXIT_SUCCESS;
+    read(fd, super, sizeof(struct ext2_super_block));
+
+    s = (super->s_magic == EXT2_SUPER_MAGIC) ? "This is ext2" : "This is not ext2 system";
+    cout << s << " magic is: " << super->s_inodes_count << endl;
+
+    if (super->s_magic != EXT2_SUPER_MAGIC)
+        return EXIT_FAILURE;
+    block_size = 1024 << super->s_log_block_size;
+    cout << "Reading super-block" << endl;
+    cout << "Inodes count            : " << super->s_inodes_count << endl;
+    cout << "Blocks count            : " << super->s_blocks_count << endl;
+    cout << "Reserved blocks count   : " << super->s_r_blocks_count << endl;
+    cout << "Free blocks count       : " << super->s_free_blocks_count << endl;
+    cout << "Free inodes count       : " << super->s_free_inodes_count << endl;
+    cout << "First data block        : " << super->s_first_data_block << endl;
+    cout << "Block size              : " << block_size << endl;
+    cout << "Blocks per group        : " << super->s_blocks_per_group << endl;
+    cout << "Inodes per group        : " << super->s_inodes_per_group << endl;
+    cout << "Creator OS              : " << super->s_creator_os << endl;
+    cout << "First non-reserved inode: " << super->s_first_ino << endl;
+    cout << "Size of inode structure : " << super->s_inode_size << endl;
+
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    string img = (argc < 2) ? "ext2_fs_no_MBR.img" : argv[1];
+    cout << img << endl;
+    struct ext2_super_block super{};
+    int fd;
+    if ((fd = open(img.c_str(), O_RDONLY)) < 0)
+        cout << "file open failure!" << endl;
+
+    print_super(fd, &super);
+
+
 }

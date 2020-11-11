@@ -1,8 +1,8 @@
-# Lab 2 Option 3: Adder
+# Lab 7 File System analyzer Option:ext2
 
 ## Team
 
- - [Volodymyr Chernetskyi](https://github.com/chernetskyi)
+ - [Danylo Sluzhynskyi](https://github.com/sluzhynskyi)
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ Dependencies (such as development libraries) can be found in the [dependencies f
 
 1. Clone the project.
     ```bash
-    git clone git@github.com:chernetskyi/cpp-template.git
+    git clone https://github.com/sluzhynskyi/fs_analyzer.git
     ```
 2. Install required packages.
 
@@ -33,13 +33,3 @@ Dependencies (such as development libraries) can be found in the [dependencies f
     cmake -Bbuild
     cmake --build build
     ```
-
-## Usage
-
-```bash
-add [a] [b]
-```
-
-If less than two numbers provided, zeroes are used instead. If more - an error occurs.
-
-Help flags `-h`/`--help` support is available.
